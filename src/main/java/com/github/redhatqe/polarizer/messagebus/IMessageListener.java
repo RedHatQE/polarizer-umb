@@ -58,7 +58,7 @@ public interface IMessageListener {
             try {
                 conn.close();
                 root = bl.parseMessage(msg);
-            } catch (ExecutionException | InterruptedException | JMSException e) {
+            } catch (JMSException e) {
                 e.printStackTrace();
             }
             if (root != null)

@@ -1,7 +1,6 @@
 package com.github.redhatqe.polarizer.messagebus;
 
 
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -72,6 +71,21 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         this.broker = this.brokerConfig.getBrokers().get(this.brokerConfig.getDefaultBroker());
         this.messages = new CircularFifoQueue<>(20);
         this.nodeSub = this.setupDefaultSubject(hdlr);
+    }
+
+    public Subject<ObjectNode> getNodeSub() {
+        return this.nodeSub;
+    }
+
+    public Integer getMessageCount() {
+        return messageCount;
+    }
+
+    public void setMessages(Integer messageCount) {
+        this.messageCount = messageCount;
+        CircularFifoQueue<MessageResult<T>> fifo = new CircularFifoQueue<>(messageCount);
+        fifo.addAll(this.messages);
+        this.messages = fifo;
     }
 
     public String getClientID() { return this.clientID; }
@@ -188,7 +202,10 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
 
             Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             Queue dest = session.createQueue(publishDest);
-            consumer = session.createConsumer(dest, selector);
+            if (selector.equals(""))
+                consumer = session.createConsumer(dest);
+            else
+                consumer = session.createConsumer(dest, selector);
 
             // FIXME: We need to have some way to know when we see our message.
             consumer.setMessageListener(listener);
@@ -216,7 +233,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
      * @throws JMSException
      */
     @Override
-    public ObjectNode parseMessage(Message msg) throws ExecutionException, InterruptedException, JMSException  {
+    public ObjectNode parseMessage(Message msg) throws JMSException  {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode root = mapper.createObjectNode();
         if (msg instanceof MapMessage) {
@@ -232,7 +249,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         else if (msg instanceof TextMessage) {
             TextMessage tm = (TextMessage) msg;
             String text = tm.getText();
-            this.logger.info(text);
+            this.logger.debug(text);
             try {
                 JsonNode node = mapper.readTree(text);
                 root.set("root", node);  // FIXME: this is hacky
@@ -372,12 +389,12 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         CIBusListener<DefaultResult> bl = new CIBusListener<>();
 
         Broker b = bl.brokerConfig.getBrokers().get("ci");
-        b.setMessageMax(1);
+        b.setMessageMax(100);
 
-        Map<String, String> props = new HashMap<>();
-        props.put(args[0], args[1]);
+        //Map<String, String> props = new HashMap<>();
+        //props.put(args[0], args[1]);
 
-        String sel = String.format("%s='%s'", args[0], args[1]);
+        String sel = String.format("%s", args[0]);
         String publishDest = String.format("Consumer.%s.%s", bl.clientID, TOPIC);
         Optional<Connection> rconn = bl.tapIntoMessageBus(sel, bl.createListener(bl.messageParser()), publishDest);
 
@@ -388,7 +405,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
                 ObjectNode node = result.getNode().get();
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode testing = node.get("root");
-                bl.logger.info(testing.asText());
+                //bl.logger.info(testing.asText());
             } else
                 bl.logger.error("No message node");
         }

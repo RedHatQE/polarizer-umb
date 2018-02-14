@@ -6,7 +6,8 @@ import java.util.Optional;
 public class MessageResult<T> {
     private ObjectNode node;
     private Status status;
-    public String errorDetails = "";
+    private String errorDetails = "";
+    private String body;
     // FIXME:  Instead of ProcessingInfo, this should be a MessageResult<T>
     public T info;
 
@@ -42,6 +43,22 @@ public class MessageResult<T> {
         this.status = stat;
     }
 
+    public String getErrorDetails() {
+        return errorDetails;
+    }
+
+    public void setErrorDetails(String errorDetails) {
+        this.errorDetails = errorDetails;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public void setBody(String body) {
+        this.body = body;
+    }
+
     public enum Status {
         FAILED,                 // The request from the Receiving (eg Polarion) side failed
         SUCCESS,                // The request from the Receiving side passed
@@ -53,6 +70,7 @@ public class MessageResult<T> {
         SEND_FAIL,              // The http post failed for some reason
         NP_EXCEPTION,           // Null pointer exception occurred (usually on sending side)
         WRONG_MESSAGE_FORMAT,   // Message was received, but was not of the expected format
+        ERROR,                  // Message was received, but some exception took place
         JMS_EXCEPTION;          // JMS exception occurred, either on sending or receiving side
     }
 }
