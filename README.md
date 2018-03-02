@@ -13,6 +13,16 @@ to listen for objects, by bridging the MessageListener with an rxjava Observable
 - Because not every QE team uses python
 - Because having a Jenkins plugin that listens for messages to kick off a job based on JMS message is not the only use case
 
+While the redhat-ci-jenkins plugin is definitely useful, it's also not flexible.  Ideally, a higher level library
+should have been created and the jenkins plugin would have been written to use this.  In other words, the plugin would
+have just been another client making use of the library.  Had this strategy been followed, other teams with other 
+requirements (for example, not testing on jenkins or with other workflows) could have made use of it too. 
+
+Currently, if another application wants to make use of this library, they would need to follow the directions for setting up their
+own TLS cert and getting the appropriate permissions.  This is not needed if they only wish to make use of listening for messages on 
+the UMB that are published from the following queue Destination:
+
+
 ## Configuration and Requirements
 
 The JMS broker we are using requires client side TLS authentication.  If you have a Broker that requires this, you need to set up
