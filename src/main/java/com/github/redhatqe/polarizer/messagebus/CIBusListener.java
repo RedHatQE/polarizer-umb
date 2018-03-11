@@ -31,20 +31,22 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
     public Logger logger = LogManager.getLogger(CIBusListener.class.getName());
     private String topic;
     private Subject<ObjectNode> nodeSub;
+    private Subject<MessageResult<T>> resultSubject;
     private Integer messageCount = 0;
     public CircularFifoQueue<MessageResult<T>> messages;
     private static final Integer SUBJECT_COMPLETED = -1;
+    private Connection connection = null;
 
 
     public CIBusListener() {
-        this(IMessageListener.defaultHandler(), ICIBus.getDefaultConfigPath());
+        // this(IMessageListener.defaultHandler(), ICIBus.getDefaultConfigPath());
     }
 
-    public CIBusListener(MessageHandler hdlr) {
+    public CIBusListener(MessageHandler<T> hdlr) {
         this(hdlr, ICIBus.getDefaultConfigPath());
     }
 
-    public CIBusListener(MessageHandler hdlr, String path) {
+    public CIBusListener(MessageHandler<T> hdlr, String path) {
         super();
         this.topic = TOPIC;
         this.uuid = UUID.randomUUID();
@@ -55,10 +57,11 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
                 .orElseThrow(() -> new NoConfigFoundError(String.format("Could not find configuration file at %s", this.configPath)));
         this.broker = this.brokerConfig.getBrokers().get(this.brokerConfig.getDefaultBroker());
         this.messages = new CircularFifoQueue<>(20);
+        this.resultSubject = this.setupResultSubject();
         this.nodeSub = this.setupDefaultSubject(hdlr);
     }
 
-    public CIBusListener(MessageHandler hdlr, BrokerConfig cfg) {
+    public CIBusListener(MessageHandler<T> hdlr, BrokerConfig cfg) {
         super();
         this.topic = TOPIC;
         this.uuid = UUID.randomUUID();
@@ -70,11 +73,16 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
             throw new NoConfigFoundError("BrokerConfig can't be null");
         this.broker = this.brokerConfig.getBrokers().get(this.brokerConfig.getDefaultBroker());
         this.messages = new CircularFifoQueue<>(20);
+        this.resultSubject = this.setupResultSubject();
         this.nodeSub = this.setupDefaultSubject(hdlr);
     }
 
     public Subject<ObjectNode> getNodeSub() {
         return this.nodeSub;
+    }
+
+    public Subject<MessageResult<T>> getResultSubject() {
+        return resultSubject;
     }
 
     public Integer getMessageCount() {
@@ -96,13 +104,14 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
      * @param handler A MessageHandler that will be applied by the subscriber
      * @return A Subject which will pass the Object node along
      */
-    private Subject<ObjectNode> setupDefaultSubject(MessageHandler handler) {
+    private Subject<ObjectNode> setupDefaultSubject(MessageHandler<T> handler) {
         // handler for onNext
         Consumer<ObjectNode> next = (ObjectNode node) -> {
-            MessageResult result = handler.handle(node);
+            MessageResult<T> result = handler.handle(node);
             // FIXME: I dont like storing state like this, but onNext doesn't return anything
             this.messageCount++;
             this.messages.add(result);
+            this.resultSubject.onNext(result);
         };
         // handler for onComplete
         Action act = () -> {
@@ -113,6 +122,19 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         Subject<ObjectNode> n = PublishSubject.create();
         n.subscribe(next, Throwable::printStackTrace, act);
         return n;
+    }
+
+    private Subject<MessageResult<T>>
+    setupResultSubject() {
+        Consumer<MessageResult<T>> next = (n) -> {
+            logger.info(n.getBody());
+        };
+        Action act = () -> {
+            logger.info("resultSubject stopped listening");
+        };
+        Subject<MessageResult<T>> subj = PublishSubject.create();
+        subj.subscribe(next, Throwable::printStackTrace, act);
+        return subj;
     }
 
     /**
@@ -190,6 +212,10 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
     tapIntoMessageBus( String selector
                      , MessageListener listener
                      , String publishDest) {
+        if (this.connection != null) {
+            logger.info("This CIBusListener already being used.  Create another CIBusListner object");
+            return Optional.of(this.connection);
+        }
         String brokerUrl = this.broker.getUrl();
         ActiveMQConnectionFactory factory = this.setupFactory(brokerUrl, this.broker);
         Connection connection = null;
@@ -216,6 +242,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
             logger.error("Error getting keystore");
             e.printStackTrace();
         }
+        this.connection = connection;
         return Optional.ofNullable(connection);
     }
 
@@ -376,6 +403,9 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         });
     }
 
+    public Connection getConnection() {
+        return connection;
+    }
 
     /**
      * Does 2 things: launches waitForMessage from a Fork/Join pool thread and the main thread waits for user to quit
