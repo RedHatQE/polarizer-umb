@@ -21,9 +21,19 @@ public interface IMessageListener {
      *
      * @return MessageHandler lambda
      */
-    static MessageHandler<DefaultResult> defaultHandler() {
-        return (node) -> {
-            MessageResult<DefaultResult> result = new MessageResult<>(node);
+    static <T> MessageHandler<T> defaultHandler() {
+        return (ObjectNode node) -> {
+            MessageResult<T> result = new MessageResult<>();
+            if (node == null) {
+                System.err.println("No message was received");
+                result.setStatus(MessageResult.Status.NO_MESSAGE);
+                return result;
+            }
+
+            String body = node.toString();
+            result.setStatus(MessageResult.Status.SUCCESS);
+            result.setBody(body);
+            result.setNode(node);
             return result;
         };
     }

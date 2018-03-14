@@ -39,7 +39,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
 
 
     public CIBusListener() {
-        // this(IMessageListener.defaultHandler(), ICIBus.getDefaultConfigPath());
+        this(IMessageListener.defaultHandler(), ICIBus.getDefaultConfigPath());
     }
 
     public CIBusListener(MessageHandler<T> hdlr) {
@@ -350,7 +350,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
      *
      * @param args
      */
-    public static void test(String[] args) throws ExecutionException, InterruptedException, JMSException {
+    public static void main(String[] args) throws ExecutionException, InterruptedException, JMSException {
         // FIXME: Use guice to make something that is an IMessageListener so we can mock it out
         CIBusListener<DefaultResult> bl = new CIBusListener<>();
 
@@ -414,7 +414,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
      *
      * @param args
      */
-    public static void main(String[] args) throws ExecutionException, InterruptedException, JMSException {
+    public static void main2(String[] args) throws ExecutionException, InterruptedException, JMSException {
         // FIXME: Use guice to make something that is an IMessageListener so we can mock it out
         CIBusListener<DefaultResult> bl = new CIBusListener<>();
 
@@ -427,6 +427,9 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         String sel = String.format("%s", args[0]);
         String publishDest = String.format("Consumer.%s.%s", bl.clientID, TOPIC);
         Optional<Connection> rconn = bl.tapIntoMessageBus(sel, bl.createListener(bl.messageParser()), publishDest);
+        bl.getResultSubject().subscribe(n -> {
+            bl.logger.info(n.getBody());
+        });
 
         bl.listenUntil(60000L);
         if (!bl.messages.isEmpty()) {

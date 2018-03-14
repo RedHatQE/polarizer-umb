@@ -6,8 +6,8 @@ import com.github.redhatqe.polarizer.messagebus.exceptions.NoConfigFoundError;
 import com.github.redhatqe.polarizer.messagebus.utils.ArgHelper;
 import com.github.redhatqe.polarizer.messagebus.utils.Tuple;
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.jms.*;
 import java.io.IOException;
@@ -19,7 +19,7 @@ import java.util.UUID;
  *
  */
 public class CIBusPublisher extends CIBusClient implements ICIBus {
-    private Logger logger = LoggerFactory.getLogger(CIBusListener.class);
+    public Logger logger = LogManager.getLogger(CIBusListener.class.getName());
     private String publishDest;
     public static final String DEFAULT_PUBLISH_DEST = "VirtualTopic.qe.ci.jenkins";
 
@@ -93,6 +93,13 @@ public class CIBusPublisher extends CIBusClient implements ICIBus {
         return this.sendMessage(text, broker.getUrl(), opts);
     }
 
+    /**
+     * Sends a JMS Message to a broker
+     * @param text
+     * @param url
+     * @param opts
+     * @return
+     */
     public Optional<Connection>
     sendMessage(String text, String url, JMSMessageOptions opts) {
         ActiveMQConnectionFactory factory = this.setupFactory(url, this.broker);
