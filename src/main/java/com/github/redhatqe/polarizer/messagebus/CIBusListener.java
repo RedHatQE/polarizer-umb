@@ -220,6 +220,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         ActiveMQConnectionFactory factory = this.setupFactory(brokerUrl, this.broker);
         Connection connection = null;
         MessageConsumer consumer;
+        logger.info(String.format("In CIBusListener: Using selector of %s", selector));
 
         try {
             connection = factory.createConnection();
