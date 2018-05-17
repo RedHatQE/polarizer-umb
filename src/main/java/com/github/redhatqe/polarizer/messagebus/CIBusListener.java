@@ -1,6 +1,7 @@
 package com.github.redhatqe.polarizer.messagebus;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -8,8 +9,11 @@ import com.github.redhatqe.polarizer.messagebus.config.Broker;
 import com.github.redhatqe.polarizer.messagebus.config.BrokerConfig;
 import com.github.redhatqe.polarizer.messagebus.exceptions.NoConfigFoundError;
 import com.github.redhatqe.polarizer.messagebus.utils.Tuple;
+import com.github.redhatqe.polarizer.reporter.configuration.Serializer;
+import com.github.redhatqe.polarizer.reporter.utils.JsonHelper;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
+import io.reactivex.subjects.BehaviorSubject;
 import io.reactivex.subjects.PublishSubject;
 import io.reactivex.subjects.Subject;
 import org.apache.activemq.ActiveMQConnectionFactory;
@@ -19,6 +23,7 @@ import org.apache.logging.log4j.Logger;
 
 import javax.jms.*;
 import javax.jms.Queue;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
@@ -28,7 +33,7 @@ import java.util.concurrent.ExecutionException;
  * A Class that provides functionality to listen to the CI Message Bus
  */
 public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageListener {
-    public Logger logger = LogManager.getLogger(CIBusListener.class.getName());
+    static public Logger logger = LogManager.getLogger(CIBusListener.class.getName());
     private String topic;
     private Subject<ObjectNode> nodeSub;
     private Subject<MessageResult<T>> resultSubject;
@@ -108,6 +113,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         // handler for onNext
         Consumer<ObjectNode> next = (ObjectNode node) -> {
             MessageResult<T> result = handler.handle(node);
+            logger.info("Got a message");
             // FIXME: I dont like storing state like this, but onNext doesn't return anything
             this.messageCount++;
             this.messages.add(result);
@@ -119,15 +125,24 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
             this.messageCount = SUBJECT_COMPLETED;
         };
         // FIXME: use DI to figure out what kind of Subject to create, ie AsyncSubject, BehaviorSubject, etc
-        Subject<ObjectNode> n = PublishSubject.create();
+        Subject<ObjectNode> n = BehaviorSubject.create();
         n.subscribe(next, Throwable::printStackTrace, act);
         return n;
     }
 
     private Subject<MessageResult<T>>
     setupResultSubject() {
+        ObjectMapper mapper = new ObjectMapper();
         Consumer<MessageResult<T>> next = (n) -> {
-            logger.info(n.getBody());
+            n.getNode().ifPresent(node -> {
+                JsonNode root = node.get("root");
+                try {
+                    Object text = mapper.treeToValue(root, Object.class);
+                    logger.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(text));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
         };
         Action act = () -> {
             logger.info("resultSubject stopped listening");
@@ -177,7 +192,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
             factory.setPassword(pw);
             connection = factory.createConnection();
             connection.setClientID(this.clientID);
-            connection.setExceptionListener(exc -> this.logger.error(exc.getMessage()));
+            connection.setExceptionListener(exc -> logger.error(exc.getMessage()));
 
             Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             Topic dest = session.createTopic(this.topic);
@@ -185,7 +200,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
             if (selector == null || selector.equals(""))
                 throw new Error("Must supply a value for the selector");
 
-            this.logger.debug(String.format("Using selector of:\n%s", selector));
+            logger.debug(String.format("Using selector of:\n%s", selector));
             connection.start();
             consumer = session.createConsumer(dest, selector);
             String timeout = this.broker.getMessageTimeout().toString();
@@ -225,7 +240,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         try {
             connection = factory.createConnection();
             connection.setClientID(this.clientID);
-            connection.setExceptionListener(exc -> this.logger.error(exc.getMessage()));
+            connection.setExceptionListener(exc -> logger.error(exc.getMessage()));
 
             Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             Queue dest = session.createQueue(publishDest);
@@ -276,8 +291,24 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         }
         else if (msg instanceof TextMessage) {
             TextMessage tm = (TextMessage) msg;
+            Enumeration props = tm.getPropertyNames();
+            while(props.hasMoreElements()) {
+                String p = props.nextElement().toString();
+                if (p.equals("type")) {
+                    String val = msg.getStringProperty("type");
+                    logger.info(String.format("Message prop: type=%s", val));
+                }
+                else if (p.equals("rhsm_qe")) {
+                    String val = msg.getStringProperty("rhsm_qe");
+                    logger.info(String.format("Message prop: rhsm_qe=%s", val));
+                }
+                else if (p.equals("job-id")) {
+                    String val = msg.getStringProperty("job-id");
+                    logger.info(String.format("Message prop: job-id=%s", val));
+                }
+            }
             String text = tm.getText();
-            this.logger.debug(text);
+            logger.info(text);
             try {
                 JsonNode node = mapper.readTree(text);
                 root.set("root", node);  // FIXME: this is hacky
@@ -287,7 +318,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         }
         else {
             String err = msg == null ? " was null" : msg.toString();
-            this.logger.error(String.format("Unknown Message:  Could not read message %s", err));
+            logger.error(String.format("Unknown Message:  Could not read message %s", err));
         }
         return root;
     }
@@ -351,7 +382,7 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
      *
      * @param args
      */
-    public static void main(String[] args) throws ExecutionException, InterruptedException, JMSException {
+    public static void main2(String[] args) throws ExecutionException, InterruptedException, JMSException {
         // FIXME: Use guice to make something that is an IMessageListener so we can mock it out
         CIBusListener<DefaultResult> bl = new CIBusListener<>();
 
@@ -362,12 +393,13 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         Map<String, String> props = new HashMap<>();
         props.put("rhsm_qe", "polarize_bus");
 
-        String sel = "rhsm_qe='polarize_bus'";
+        String sel = "rhsm_qe='xunit_importer'";
         String publishDest = String.format("Consumer.%s.%s", bl.clientID, TOPIC);
         Optional<Connection> rconn = bl.tapIntoMessageBus(sel, bl.createListener(bl.messageParser()), publishDest);
+        //Thread.sleep(10000);
         Optional<Connection> sconn = cbp.sendMessage(body, b, new JMSMessageOptions("stoner-polarize", props));
 
-        bl.listenUntil(10000L);
+        bl.listenUntil(10);
         MessageResult<DefaultResult> result = bl.messages.remove();
         if (result.getNode().isPresent()) {
             ObjectNode node = result.getNode().get();
@@ -408,6 +440,61 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         return connection;
     }
 
+    public static MessageHandler<DefaultResult> xunitMsgHandler() {
+        return (ObjectNode node) -> {
+            JsonNode root = node.get("root");
+            MessageResult<DefaultResult> result = new MessageResult<>(node);
+            result.info = new DefaultResult();
+
+            try {
+                Boolean passed = root.get("status").textValue().equals("passed");
+                if (passed) {
+                    logger.info("In xunitMsgHandler: XUnit importer was successful");
+                    String testrunUrl = root.get("testrun-url").textValue();
+                    logger.info(String.format("Polarion TestRun = %s", testrunUrl));
+                    result.info.setText(JsonHelper.nodeToString(root));
+                    result.setStatus(MessageResult.Status.SUCCESS);
+                }
+                else {
+                    // Figure out which one failed
+                    if (root.has("import-results")) {
+                        JsonNode results = root.get("import-results");
+                        List<String> suites = new ArrayList<>();
+                        results.elements().forEachRemaining(element -> {
+                            if (element.has("status") && !element.get("status").textValue().equals("passed")) {
+                                if (element.has("suite-name")) {
+                                    String suite = element.get("suite-name").textValue();
+                                    suites.add(suite);
+                                    logger.info(suite + " failed to be updated");
+                                }
+                            }
+                        });
+                        result.setStatus(MessageResult.Status.FAILED);
+                        result.setErrorDetails("TestSuites failed to be updated: " + String.join(",", suites));
+                    }
+                    else {
+                        logger.error(root.get("message").asText());
+                        result.setStatus(MessageResult.Status.EMPTY_MESSAGE);
+                        result.setErrorDetails(root.get("message").toString());
+                    }
+                }
+            } catch (NullPointerException npe) {
+                String err = "Unknown format of message from bus";
+                logger.error(err);
+                result.setStatus(MessageResult.Status.NP_EXCEPTION);
+                result.setErrorDetails(err);
+            } catch (JsonProcessingException e) {
+                String err = "Unable to deserialize JsonNode";
+                logger.error(err);
+                result.setStatus(MessageResult.Status.WRONG_MESSAGE_FORMAT);
+                result.setErrorDetails(err);
+                e.printStackTrace();
+            }
+            return result;
+        };
+    }
+
+
     /**
      * Does 2 things: launches waitForMessage from a Fork/Join pool thread and the main thread waits for user to quit
      *
@@ -415,8 +502,12 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
      *
      * @param args
      */
-    public static void main2(String[] args) throws ExecutionException, InterruptedException, JMSException {
+    public static void main(String[] args) throws ExecutionException, InterruptedException, JMSException, IOException {
         // FIXME: Use guice to make something that is an IMessageListener so we can mock it out
+        String defaultBrokerPath = ICIBus.getDefaultConfigPath();
+        BrokerConfig brokerCfg = Serializer.fromYaml(BrokerConfig.class, new File(defaultBrokerPath));
+
+        //CIBusListener<DefaultResult> bl = new CIBusListener<>(xunitMsgHandler(), brokerCfg);
         CIBusListener<DefaultResult> bl = new CIBusListener<>();
 
         Broker b = bl.brokerConfig.getBrokers().get("ci");
@@ -425,14 +516,17 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
         //Map<String, String> props = new HashMap<>();
         //props.put(args[0], args[1]);
 
-        String sel = String.format("%s", args[0]);
+        //String sel = String.format("%s='%s'", args[0], args[1]);
+        String sel = "rhsm_qe='testcase_importer'";
         String publishDest = String.format("Consumer.%s.%s", bl.clientID, TOPIC);
+        logger.info(String.format("Topic = %s", publishDest));
         Optional<Connection> rconn = bl.tapIntoMessageBus(sel, bl.createListener(bl.messageParser()), publishDest);
         bl.getResultSubject().subscribe(n -> {
-            bl.logger.info(n.getBody());
+            logger.info(n.getBody());
         });
 
-        bl.listenUntil(60000L);
+        bl.listenUntil(1);
+        //bl.listenUntil(1);
         if (!bl.messages.isEmpty()) {
             MessageResult<DefaultResult> result = bl.messages.remove();
             if (result.getNode().isPresent()) {
@@ -441,12 +535,12 @@ public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageLis
                 JsonNode testing = node.get("root");
                 //bl.logger.info(testing.asText());
             } else
-                bl.logger.error("No message node");
+                logger.error("No message node");
         }
 
         rconn.ifPresent((Connection c) -> {
             try {
-                bl.logger.info("Closing the receiver connection");
+                logger.info("Closing the receiver connection");
                 c.close();
             } catch (JMSException e) {
                 e.printStackTrace();

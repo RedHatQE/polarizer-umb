@@ -39,7 +39,7 @@ dependencies {
     api group: 'org.apache.activemq', name: 'activemq-all', version: '5.15.2'
     api group: 'org.apache.commons', name: 'commons-collections4', version: '4.1'
 
-    implementation 'com.github.redhatqe.polarizer:reporter:0.2.2'
+    implementation 'com.github.redhatqe.polarizer:reporter:0.2.3-SNAPSHOT'
     compile group: 'io.reactivex.rxjava2', name: 'rxjava', version: '2.1.13'
 }
 
