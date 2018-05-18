@@ -269,27 +269,6 @@ For example, let's say we have the following information:
   - TestCase Importer: **TODO: same as above** 
 
 
-### Client Authentication and Authorization
-
-In order to be able to publish (send) and subscribe (listen) for messages on the UMB, you need to do a couple of things
-
-- Create a Servicenow Ticket requesting access to the UMB
-  - Pick a client name
-  - Pick the LDAP permissions you need for your application
-  - Choose a topic name
-- Create a TLS certificate from the Red Hat Certificate Server
-  - Pick an Environment (Dev, QA, Prod, Stage)
-- Import the certificate by creating a .p12 file
-
-For Java applications you will also need to do the following:
-
-- Import the .p12 certificate into a java keystore
-  - Remember the password you chose and store it somewhere secure
-- Create a truststore from the Red Hat IT Root CA cert
-  - Remember the password you chose and store it somewhere secure
-- Create an instance of the ActiveMQSslFactory
-  - call the setKeystore, setKeystorePassword, setKeystoreKeyPassword, setTruststore and setTruststorePassword on the factory object
-
 ## References
 
 
