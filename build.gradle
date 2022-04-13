@@ -28,7 +28,7 @@ String watchForChange = 'src/**/*'
 String doOnChange = '/.gradlew classes'
 String projectURL = 'https://github.com/RareBreed/polarizer-umb.git'
 String devURL = 'git@github.com:RareBreed/polarizer-umb.git'
-String propFile = System.getProperty("user.home") + "/.polarizer/polarizer-project.properties"
+// String propFile = System.getProperty("user.home") + "/.polarizer/polarizer-project.properties"
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
@@ -43,42 +43,42 @@ dependencies {
     compile group: 'io.reactivex.rxjava2', name: 'rxjava', version: '2.1.13'
 }
 
-class Creds {
-    public String user
-    public String pw
+// class Creds {
+//     public String user
+//     public String pw
 
-    Creds(String u, String p) {
-        this.user = u
-        this.pw = p
-    }
-}
+//     Creds(String u, String p) {
+//         this.user = u
+//         this.pw = p
+//     }
+// }
 
-def getCreds(String polarizePropertyFile) {
-    File f = new File(polarizePropertyFile)
-    Properties props = new Properties()
-    props.load(f.newDataInputStream())
-    return new Creds(props.getProperty("ossrhUsername"), props.getProperty("ossrhPassword"))
-}
+// def getCreds(String polarizePropertyFile) {
+//     File f = new File(polarizePropertyFile)
+//     Properties props = new Properties()
+//     props.load(f.newDataInputStream())
+//     return new Creds(props.getProperty("ossrhUsername"), props.getProperty("ossrhPassword"))
+// }
 
-def getCreds(String polarizePropertyFile, String field1, String field2) {
-    File f = new File(polarizePropertyFile)
-    Properties props = new Properties()
-    props.load(f.newDataInputStream())
-    return new Creds(props.getProperty(field1), props.getProperty(field2))
-}
+// def getCreds(String polarizePropertyFile, String field1, String field2) {
+//     File f = new File(polarizePropertyFile)
+//     Properties props = new Properties()
+//     props.load(f.newDataInputStream())
+//     return new Creds(props.getProperty(field1), props.getProperty(field2))
+// }
 
-Creds credsOssrh = getCreds(propFile)
+// Creds credsOssrh = getCreds(propFile)
 
 repositories {
     jcenter ()
     mavenLocal()
-    maven {
-        url 'https://oss.sonatype.org/content/repositories/snapshots/'
-        credentials {
-            username credsOssrh.user
-            password credsOssrh.pw
-        }
-    }
+    // maven {
+    //     url 'https://oss.sonatype.org/content/repositories/snapshots/'
+    //     credentials {
+    //         username credsOssrh.user
+    //         password credsOssrh.pw
+    //     }
+    // }
 }
 
 task wrapper(type: Wrapper) {
@@ -115,6 +115,7 @@ configurations {
 }
 
 signing {
+    required { gradle.taskGraph.hasTask("uploadArchives") }
     sign configurations.archives
 }
 
@@ -143,66 +144,66 @@ def pomConfig = {
 
 publishing {
     publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            artifact sourceJar
-            artifact javadocJar
-            artifact shadowJar
-            groupId project.group
-            artifactId project.name
-            version "${version}"
-            pom.withXml {
-                def root = asNode()
-                root.appendNode('description', 'JAXB classes for xunit and testcases, TestNG reporter')
-                root.appendNode('name', 'polarizer-umb')
-                root.appendNode('url', "${projectURL}")
-                root.children().last() + pomConfig
-            }
-        }
+        // mavenJava(MavenPublication) {
+        //     from components.java
+        //     artifact sourceJar
+        //     artifact javadocJar
+        //     artifact shadowJar
+        //     groupId project.group
+        //     artifactId project.name
+        //     version "${version}"
+        //     pom.withXml {
+        //         def root = asNode()
+        //         root.appendNode('description', 'JAXB classes for xunit and testcases, TestNG reporter')
+        //         root.appendNode('name', 'polarizer-umb')
+        //         root.appendNode('url', "${projectURL}")
+        //         root.children().last() + pomConfig
+        //     }
+        // }
     }
 }
 
 uploadArchives {
     repositories {
-        mavenDeployer {
-            Creds creds = getCreds(propFile)
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+        // mavenDeployer {
+        //     Creds creds = getCreds(propFile)
+        //     beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
-            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: creds.user, password: creds.pw)
-            }
+        //     repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+        //         authentication(userName: creds.user, password: creds.pw)
+        //     }
 
-            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: creds.user, password: creds.pw)
-            }
+        //     snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+        //         authentication(userName: creds.user, password: creds.pw)
+        //     }
 
-            pom.project {
-                name project.name
-                packaging 'jar'
-                description 'Library to help with configuration'
-                url projectURL
+        //     pom.project {
+        //         name project.name
+        //         packaging 'jar'
+        //         description 'Library to help with configuration'
+        //         url projectURL
 
-                scm {
-                    connection "scm:git:${projectURL}.git"
-                    developerConnection "scm:git:${devURL}"
-                    url projectURL
-                }
+        //         scm {
+        //             connection "scm:git:${projectURL}.git"
+        //             developerConnection "scm:git:${devURL}"
+        //             url projectURL
+        //         }
 
-                licenses {
-                    license {
-                        name 'The Apache License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
+        //         licenses {
+        //             license {
+        //                 name 'The Apache License, Version 2.0'
+        //                 url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+        //             }
+        //         }
 
-                developers {
-                    developer {
-                        id 'stoner'
-                        name 'Sean Toner'
-                        email 'stoner@redhat.com'
-                    }
-                }
-            }
-        }
+        //         developers {
+        //             developer {
+        //                 id 'stoner'
+        //                 name 'Sean Toner'
+        //                 email 'stoner@redhat.com'
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

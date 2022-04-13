@@ -18,8 +18,9 @@ import io.reactivex.subjects.PublishSubject;
 import io.reactivex.subjects.Subject;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.commons.collections4.queue.CircularFifoQueue;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.jms.*;
 import javax.jms.Queue;
@@ -33,7 +34,7 @@ import java.util.concurrent.ExecutionException;
  * A Class that provides functionality to listen to the CI Message Bus
  */
 public class CIBusListener<T> extends CIBusClient implements ICIBus, IMessageListener {
-    static public Logger logger = LogManager.getLogger(CIBusListener.class.getName());
+    static public Logger logger = LoggerFactory.getLogger(CIBusListener.class.getName());
     private String topic;
     private Subject<ObjectNode> nodeSub;
     private Subject<MessageResult<T>> resultSubject;

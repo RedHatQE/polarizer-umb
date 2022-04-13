@@ -4,8 +4,8 @@ import com.github.redhatqe.polarizer.messagebus.config.Broker;
 import com.github.redhatqe.polarizer.reporter.configuration.Serializer;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.ActiveMQSslConnectionFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,7 +16,7 @@ import java.util.Optional;
  *
  */
 public interface ICIBus {
-    Logger logger = LogManager.getLogger("byzantine-" + ICIBus.class.getName());
+    Logger logger = LoggerFactory.getLogger("polarizer-" + ICIBus.class.getName());
 
     static String getDefaultConfigPath() {
         String home = System.getProperty("user.home");
